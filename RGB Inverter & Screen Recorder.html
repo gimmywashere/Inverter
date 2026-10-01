@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inverted RGB Screen Recorder</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for modern feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                    <i class="fa-solid fa-arrows-rotate text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white leading-tight">RGB Flip & Record</h1>
+                    <p class="text-xs text-slate-400">Live Inverted Screen Recorder</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span id="statusBadge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                    <span class="w-2 h-2 mr-1.5 rounded-full bg-slate-500"></span> Idle
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+        
+        <!-- Instruction Banner -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mb-8 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start space-x-3">
+                <div class="text-indigo-400 mt-1">
+                    <i class="fa-solid fa-circle-info text-lg"></i>
+                </div>
+                <div class="text-sm text-slate-300">
+                    <p class="font-semibold text-slate-200">How to use:</p>
+                    <ol class="list-decimal list-inside space-x-1 text-slate-400 mt-0.5">
+                        <span class="inline">1. Click <b>Start Screen Share</b>.</span>
+                        <span class="inline">2. Select the tab or window you want to invert.</span>
+                        <span class="inline">3. Click <b>Start Recording</b> to capture up to 30 seconds.</span>
+                    </ol>
+                </div>
+            </div>
+            <!-- Quick Filter Toggle Mode -->
+            <div class="flex items-center space-x-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 self-start md:self-center">
+                <span class="text-xs text-slate-400 font-medium">Inversion Method:</span>
+                <button id="toggleFilterMode" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition">
+                    Canvas Pixel Invert
+                </button>
+            </div>
+        </div>
+
+        <!-- Video Grids -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Live Screen Share Section -->
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-desktop text-slate-400"></i>
+                        <h2 class="font-semibold text-slate-200 text-sm">Live Inverted Preview</h2>
+                    </div>
+                    <span id="fpsCounter" class="text-xs font-mono text-slate-500">0 FPS</span>
+                </div>
+
+                <!-- Preview Area -->
+                <div class="relative bg-black aspect-video flex items-center justify-center overflow-hidden group">
+                    <video id="sourceVideo" autoplay playsinline muted class="hidden"></video>
+                    <canvas id="outputCanvas" class="w-full h-full object-contain"></canvas>
+
+                    <!-- Placeholder overlay when inactive -->
+                    <div id="canvasPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 z-10 transition-opacity">
+                        <div class="w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-4 border border-indigo-500/20">
+                            <i class="fa-solid fa-display text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-200 font-semibold mb-1">No Screen Share Active</h3>
+                        <p class="text-slate-400 text-xs max-w-sm mb-6">Click below to share a tab, window, or monitor to see the live RGB color inversion effect.</p>
+                        <button id="btnStartShare" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition duration-200 flex items-center space-x-2">
+                            <i class="fa-solid fa-play text-xs"></i>
+                            <span>Start Screen Share</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Indicator Overlay -->
+                    <div id="liveBadge" class="hidden absolute top-4 left-4 bg-red-600/90 text-white text-xs font-bold px-2.5 py-1 rounded-md flex items-center space-x-1.5 shadow-lg backdrop-blur-md">
+                        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                        <span>LIVE</span>
+                    </div>
+                </div>
+
+                <!-- Controls for Screen Share & Recording -->
+                <div class="p-5 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center space-x-3">
+                        <button id="btnStopShare" disabled class="px-4 py-2 bg-slate-800 text-slate-500 font-semibold text-sm rounded-xl border border-slate-700/50 hover:bg-slate-700 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
+                            <i class="fa-solid fa-stop text-xs"></i>
+                            <span>Stop Share</span>
+                        </button>
+                    </div>
+
+                    <!-- Recording Controls -->
+                    <div class="flex items-center space-x-3">
+                        <button id="btnToggleRecord" disabled class="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-rose-600/20 transition duration-200 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i id="recIcon" class="fa-solid fa-circle text-xs"></i>
+                            <span id="recText">Start Recording (Max 30s)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recording Progress Bar -->
+                <div id="progressContainer" class="w-full bg-slate-800 h-1.5 overflow-hidden hidden">
+                    <div id="progressBar" class="bg-rose-500 h-full w-0 transition-all duration-100 ease-linear"></div>
+                </div>
+            </div>
+
+            <!-- Recorded Video Output Section -->
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-film text-slate-400"></i>
+                        <h2 class="font-semibold text-slate-200 text-sm">Recorded Output Preview</h2>
+                    </div>
+                    <span id="timerDisplay" class="text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700">00:00 / 00:30</span>
+                </div>
+
+                <!-- Video Preview Area -->
+                <div class="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                    <video id="recordedVideo" controls class="w-full h-full object-contain hidden"></video>
+
+                    <div id="recordPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 z-10">
+                        <div class="w-16 h-16 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mb-4 border border-slate-700">
+                            <i class="fa-solid fa-video text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-200 font-semibold mb-1">No Recording Available</h3>
+                        <p class="text-slate-400 text-xs max-w-sm">Recorded video with live RGB color inversion will appear here for preview and download.</p>
+                    </div>
+                </div>
+
+                <!-- Controls for Recorded Video -->
+                <div class="p-5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-4">
+                    <div class="text-xs text-slate-400 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-file-video text-slate-500"></i>
+                        <span id="videoInfo">Format: WebM / VP8 or VP9</span>
+                    </div>
+
+                    <a id="btnDownload" href="#" download="inverted-screenshare.webm" class="px-5 py-2.5 bg-slate-800 text-slate-500 font-semibold text-sm rounded-xl border border-slate-700 flex items-center space-x-2 cursor-not-allowed pointer-events-none transition">
+                        <i class="fa-solid fa-download text-xs"></i>
+                        <span>Download Video</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/50 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            HTML5 Canvas MediaRecorder API • Screen Capture & RGB Inversion
+        </div>
+    </footer>
+
+    <!-- Toast Notification Container -->
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 text-slate-100 border border-slate-700 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 z-50">
+        <i id="toastIcon" class="fa-solid fa-circle-info text-indigo-400"></i>
+        <span id="toastMessage" class="text-xs font-medium">Notification message</span>
+    </div>
+
+    <script>
+        // Elements
+        const sourceVideo = document.getElementById('sourceVideo');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const ctx = outputCanvas.getContext('2d', { willReadFrequently: true });
+        const recordedVideo = document.getElementById('recordedVideo');
+        
+        const btnStartShare = document.getElementById('btnStartShare');
+        const btnStopShare = document.getElementById('btnStopShare');
+        const btnToggleRecord = document.getElementById('btnToggleRecord');
+        const btnDownload = document.getElementById('btnDownload');
+        const toggleFilterMode = document.getElementById('toggleFilterMode');
+        
+        const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+        const recordPlaceholder = document.getElementById('recordPlaceholder');
+        const liveBadge = document.getElementById('liveBadge');
+        const statusBadge = document.getElementById('statusBadge');
+        const fpsCounter = document.getElementById('fpsCounter');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const recIcon = document.getElementById('recIcon');
+        const recText = document.getElementById('recText');
+
+        // State Variables
+        let screenStream = null;
+        let animationFrameId = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordStartTime = 0;
+        let recordTimerInterval = null;
+        const MAX_RECORD_SECONDS = 30;
+
+        // Processing Mode: 'pixel' (ImageData inversion) or 'css' (Canvas Filter)
+        let filterMode = 'pixel'; 
+
+        // FPS Tracker
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+
+        // Start Screen Sharing
+        async function startScreenShare() {
+            try {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        cursor: "always"
+                    },
+                    audio: false
+                });
+
+                sourceVideo.srcObject = screenStream;
+                await sourceVideo.play();
+
+                // Setup Canvas Dimensions based on video stream
+                const videoTrack = screenStream.getVideoTracks()[0];
+                const settings = videoTrack.getSettings();
+                outputCanvas.width = settings.width || 1280;
+                outputCanvas.height = settings.height || 720;
+
+                // Handle stream ended by browser native stop bar
+                videoTrack.onended = () => {
+                    stopScreenShare();
+                };
+
+                // Update UI State
+                canvasPlaceholder.classList.add('hidden');
+                liveBadge.classList.remove('hidden');
+                btnStartShare.disabled = true;
+                btnStartShare.classList.add('opacity-50', 'cursor-not-allowed');
+                btnStopShare.disabled = false;
+                btnStopShare.classList.remove('text-slate-500', 'border-slate-700/50');
+                btnStopShare.classList.add('text-slate-200', 'border-slate-600');
+                btnToggleRecord.disabled = false;
+
+                updateStatus('Sharing', 'emerald');
+                showToast('Screen capture started!', 'success');
+
+                // Start Render Loop
+                renderFrame();
+
+            } catch (err) {
+                console.error("Error starting screen share:", err);
+                showToast('Failed or cancelled screen sharing.', 'error');
+            }
+        }
+
+        function stopScreenShare() {
+            if (isRecording) {
+                stopRecording();
+            }
+
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
+            if (screenStream) {
+                screenStream.getTracks().forEach(track => track.stop());
+                screenStream = null;
+            }
+
+            sourceVideo.srcObject = null;
+            ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+            // Update UI State
+            canvasPlaceholder.classList.remove('hidden');
+            liveBadge.classList.add('hidden');
+            btnStartShare.disabled = false;
+            btnStartShare.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnStopShare.disabled = true;
+            btnStopShare.classList.add('text-slate-500');
+            btnToggleRecord.disabled = true;
+            fpsCounter.textContent = '0 FPS';
+
+            updateStatus('Idle', 'slate');
+            showToast('Screen sharing stopped.', 'info');
+        }
+
+        function renderFrame() {
+            if (!screenStream || sourceVideo.paused || sourceVideo.ended) return;
+
+            // Ensure canvas resolution matches source
+            if (outputCanvas.width !== sourceVideo.videoWidth && sourceVideo.videoWidth > 0) {
+                outputCanvas.width = sourceVideo.videoWidth;
+                outputCanvas.height = sourceVideo.videoHeight;
+            }
+
+            if (filterMode === 'pixel') {
+                // Method 1: Pixel Manipulation using getImageData / putImageData
+                ctx.filter = 'none';
+                ctx.drawImage(sourceVideo, 0, 0, outputCanvas.width, outputCanvas.height);
+                
+                const imgData = ctx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+                const data = imgData.data;
+                const len = data.length;
+
+                // Fast pixel inversion loop
+                for (let i = 0; i < len; i += 4) {
+                    data[i]     = 255 - data[i];     // Red
+                    data[i + 1] = 255 - data[i + 1]; // Green
+                    data[i + 2] = 255 - data[i + 2]; // Blue
+                    // Alpha (data[i+3]) remains untouched
+                }
+                ctx.putImageData(imgData, 0, 0);
+
+            } else {
+                // Method 2: High-Performance Canvas Filter Invert
+                ctx.filter = 'invert(100%)';
+                ctx.drawImage(sourceVideo, 0, 0, outputCanvas.width, outputCanvas.height);
+            }
+
+            // Calculate FPS
+            const now = performance.now();
+            frameCount++;
+            if (now - lastFrameTime >= 1000) {
+                fpsCounter.textContent = `${frameCount} FPS`;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+
+            animationFrameId = requestAnimationFrame(renderFrame);
+        }
+
+        function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            if (!screenStream) return;
+
+            recordedChunks = [];
+            
+            // Capture stream directly from the canvas with inverted RGB!
+            const canvasStream = outputCanvas.captureStream(30); // 30 FPS target
+
+            let mimeType = 'video/webm;codecs=vp9';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm;codecs=vp8';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'video/webm';
+                }
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(canvasStream, { mimeType });
+            } catch (e) {
+                console.error('MediaRecorder initialization failed:', e);
+                showToast('Failed to initialize MediaRecorder.', 'error');
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = handleRecordingStopped;
+
+            mediaRecorder.start(100); // collect 100ms chunks
+            isRecording = true;
+            recordStartTime = Date.now();
+
+            // UI Adjustments for Recording State
+            btnToggleRecord.classList.remove('bg-rose-600', 'hover:bg-rose-500');
+            btnToggleRecord.classList.add('bg-amber-600', 'hover:bg-amber-500');
+            recIcon.className = 'fa-solid fa-square text-xs';
+            recText.textContent = 'Stop Recording';
+
+            progressContainer.classList.remove('hidden');
+            updateStatus('Recording', 'rose');
+            showToast('Recording started (Max 30s)...', 'info');
+
+            // Timer Loop & Auto-stop
+            recordTimerInterval = setInterval(() => {
+                const elapsedSeconds = (Date.now() - recordStartTime) / 1000;
+                const formattedTime = formatTime(Math.min(elapsedSeconds, MAX_RECORD_SECONDS));
+                timerDisplay.textContent = `${formattedTime} / 00:30`;
+
+                // Update Progress bar
+                const percent = Math.min((elapsedSeconds / MAX_RECORD_SECONDS) * 100, 100);
+                progressBar.style.width = `${percent}%`;
+
+                if (elapsedSeconds >= MAX_RECORD_SECONDS) {
+                    stopRecording();
+                    showToast('30 seconds limit reached! Recording stopped.', 'info');
+                }
+            }, 100);
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false;
+
+            if (recordTimerInterval) {
+                clearInterval(recordTimerInterval);
+                recordTimerInterval = null;
+            }
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+
+            // Reset UI Recording buttons
+            btnToggleRecord.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+            btnToggleRecord.classList.add('bg-rose-600', 'hover:bg-rose-500');
+            recIcon.className = 'fa-solid fa-circle text-xs';
+            recText.textContent = 'Start Recording (Max 30s)';
+
+            progressContainer.classList.add('hidden');
+            progressBar.style.width = '0%';
+            updateStatus('Sharing', 'emerald');
+        }
+
+        function handleRecordingStopped() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const videoUrl = URL.createObjectURL(blob);
+
+            // Display in Preview player
+            recordedVideo.src = videoUrl;
+            recordedVideo.classList.remove('hidden');
+            recordPlaceholder.classList.add('hidden');
+
+            // Setup Download link
+            btnDownload.href = videoUrl;
+            btnDownload.download = `inverted-screen-${Date.now()}.webm`;
+            btnDownload.classList.remove('cursor-not-allowed', 'pointer-events-none', 'text-slate-500');
+            btnDownload.classList.add('bg-indigo-600', 'hover:bg-indigo-500', 'text-white', 'shadow-lg', 'shadow-indigo-600/30');
+
+            showToast('Recording processed! Ready for preview.', 'success');
+        }
+
+        // Utility: Format Seconds to MM:SS
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        // Utility: Update Status Badge
+        function updateStatus(text, color) {
+            const colors = {
+                slate: 'bg-slate-500',
+                emerald: 'bg-emerald-500 animate-pulse',
+                rose: 'bg-rose-500 animate-ping'
+            };
+            statusBadge.innerHTML = `<span class="w-2 h-2 mr-1.5 rounded-full ${colors[color] || 'bg-slate-500'}"></span> ${text}`;
+        }
+
+        // Utility: Toast Notification
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.textContent = message;
+
+            if (type === 'success') {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+            } else if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-circle-xmark text-rose-400';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-info text-indigo-400';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Event Listeners
+        btnStartShare.addEventListener('click', startScreenShare);
+        btnStopShare.addEventListener('click', stopScreenShare);
+        btnToggleRecord.addEventListener('click', toggleRecording);
+
+        // Toggle Processing Mode
+        toggleFilterMode.addEventListener('click', () => {
+            if (filterMode === 'pixel') {
+                filterMode = 'css';
+                toggleFilterMode.textContent = 'Hardware Canvas Filter';
+                showToast('Switched to CSS Filter Inversion', 'info');
+            } else {
+                filterMode = 'pixel';
+                toggleFilterMode.textContent = 'Canvas Pixel Invert';
+                showToast('Switched to Direct Pixel Manipulation', 'info');
+            }
+        });
+    </script>
+</body>
+</html>
