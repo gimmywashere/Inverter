@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB Inverted Screen Recorder</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                    <i class="fa-solid fa-arrows-rotate text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white leading-tight">Inverted Screen Recorder</h1>
+                    <p class="text-xs text-slate-400">Live RGB Color Inversion & Capture</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span id="statusBadge" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                    <span class="w-2 h-2 mr-1.5 rounded-full bg-slate-500"></span> Ready
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+        
+        <!-- Error / Warning Banner for Permissions / Constraints -->
+        <div id="errorBanner" class="hidden bg-rose-950/80 border border-rose-800 rounded-2xl p-4 mb-6 text-rose-200 text-sm flex items-start space-x-3">
+            <i class="fa-solid fa-triangle-exclamation text-rose-400 text-lg mt-0.5"></i>
+            <div class="flex-grow">
+                <p class="font-semibold text-rose-100" id="errorTitle">Screen Capture Error</p>
+                <p class="text-xs text-rose-300/90 mt-0.5" id="errorMessage">Unable to access display media.</p>
+            </div>
+            <button onclick="document.getElementById('errorBanner').classList.add('hidden')" class="text-rose-400 hover:text-rose-200">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mb-8 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start space-x-3">
+                <div class="text-indigo-400 mt-1">
+                    <i class="fa-solid fa-circle-info text-lg"></i>
+                </div>
+                <div class="text-sm text-slate-300">
+                    <p class="font-semibold text-slate-200">Quick Steps:</p>
+                    <ol class="list-decimal list-inside text-slate-400 mt-0.5 text-xs sm:text-sm space-y-1">
+                        <li>Click <b>Start Screen Share</b> and allow screen access when prompted by browser.</li>
+                        <li>Live preview will show screen with inverted RGB colors.</li>
+                        <li>Click <b>Start Recording</b> to capture up to 30 seconds of inverted footage.</li>
+                    </ol>
+                </div>
+            </div>
+            <div id="protocolInfo" class="text-xs px-3 py-2 bg-slate-950/80 rounded-xl border border-slate-800 text-slate-400 flex items-center space-x-2">
+                <i class="fa-solid fa-lock text-emerald-400"></i>
+                <span id="protocolText">Checking security context...</span>
+            </div>
+        </div>
+
+        <!-- Video Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Live Screen Share Section -->
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-desktop text-slate-400"></i>
+                        <h2 class="font-semibold text-slate-200 text-sm">Live Inverted Canvas Preview</h2>
+                    </div>
+                    <span id="fpsCounter" class="text-xs font-mono text-slate-500">0 FPS</span>
+                </div>
+
+                <!-- Preview Canvas Container -->
+                <div class="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                    <video id="sourceVideo" autoplay playsinline muted class="hidden"></video>
+                    <canvas id="outputCanvas" class="w-full h-full object-contain"></canvas>
+
+                    <!-- Placeholder overlay -->
+                    <div id="canvasPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 z-10">
+                        <div class="w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-4 border border-indigo-500/20">
+                            <i class="fa-solid fa-display text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-200 font-semibold mb-1">No Screen Share Active</h3>
+                        <p class="text-slate-400 text-xs max-w-sm mb-6">Click below to start sharing your display and preview the RGB inversion.</p>
+                        <button id="btnStartShare" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition duration-200 flex items-center space-x-2">
+                            <i class="fa-solid fa-play text-xs"></i>
+                            <span>Start Screen Share</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Indicator -->
+                    <div id="liveBadge" class="hidden absolute top-4 left-4 bg-red-600/90 text-white text-xs font-bold px-2.5 py-1 rounded-md flex items-center space-x-1.5 shadow-lg backdrop-blur-md">
+                        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                        <span>LIVE</span>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="p-5 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                    <button id="btnStopShare" disabled class="px-4 py-2 bg-slate-800 text-slate-500 font-semibold text-sm rounded-xl border border-slate-700/50 hover:bg-slate-700 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
+                        <i class="fa-solid fa-stop text-xs"></i>
+                        <span>Stop Sharing</span>
+                    </button>
+
+                    <button id="btnToggleRecord" disabled class="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-rose-600/20 transition duration-200 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i id="recIcon" class="fa-solid fa-circle text-xs"></i>
+                        <span id="recText">Start Recording (Max 30s)</span>
+                    </button>
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="progressContainer" class="w-full bg-slate-800 h-1.5 overflow-hidden hidden">
+                    <div id="progressBar" class="bg-rose-500 h-full w-0 transition-all duration-100 ease-linear"></div>
+                </div>
+            </div>
+
+            <!-- Recorded Video Output -->
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-film text-slate-400"></i>
+                        <h2 class="font-semibold text-slate-200 text-sm">Recorded Output</h2>
+                    </div>
+                    <span id="timerDisplay" class="text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700">00:00 / 00:30</span>
+                </div>
+
+                <!-- Recorded Video Player -->
+                <div class="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                    <video id="recordedVideo" controls class="w-full h-full object-contain hidden"></video>
+
+                    <div id="recordPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 z-10">
+                        <div class="w-16 h-16 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mb-4 border border-slate-700">
+                            <i class="fa-solid fa-video text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-200 font-semibold mb-1">No Recording Available</h3>
+                        <p class="text-slate-400 text-xs max-w-sm">Recorded video with inverted colors will appear here.</p>
+                    </div>
+                </div>
+
+                <!-- Download Actions -->
+                <div class="p-5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-4">
+                    <span class="text-xs text-slate-400 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-file-video text-slate-500"></i>
+                        <span>Format: WebM</span>
+                    </span>
+
+                    <a id="btnDownload" href="#" download="inverted-screenshare.webm" class="px-5 py-2.5 bg-slate-800 text-slate-500 font-semibold text-sm rounded-xl border border-slate-700 flex items-center space-x-2 cursor-not-allowed pointer-events-none transition">
+                        <i class="fa-solid fa-download text-xs"></i>
+                        <span>Download Video</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/50 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            HTML5 Canvas & MediaRecorder API • Live Color Inversion
+        </div>
+    </footer>
+
+    <script>
+        // DOM Elements
+        const sourceVideo = document.getElementById('sourceVideo');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const ctx = outputCanvas.getContext('2d', { willReadFrequently: true });
+        const recordedVideo = document.getElementById('recordedVideo');
+        
+        const btnStartShare = document.getElementById('btnStartShare');
+        const btnStopShare = document.getElementById('btnStopShare');
+        const btnToggleRecord = document.getElementById('btnToggleRecord');
+        const btnDownload = document.getElementById('btnDownload');
+        
+        const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+        const recordPlaceholder = document.getElementById('recordPlaceholder');
+        const liveBadge = document.getElementById('liveBadge');
+        const statusBadge = document.getElementById('statusBadge');
+        const fpsCounter = document.getElementById('fpsCounter');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const recIcon = document.getElementById('recIcon');
+        const recText = document.getElementById('recText');
+        const errorBanner = document.getElementById('errorBanner');
+        const errorTitle = document.getElementById('errorTitle');
+        const errorMessage = document.getElementById('errorMessage');
+        const protocolText = document.getElementById('protocolText');
+
+        // State variables
+        let screenStream = null;
+        let animationFrameId = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordStartTime = 0;
+        let recordTimerInterval = null;
+        const MAX_RECORD_SECONDS = 30;
+
+        // Performance / FPS
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+
+        // Protocol Check
+        window.addEventListener('DOMContentLoaded', () => {
+            const isSecure = window.isSecureContext;
+            if (isSecure) {
+                protocolText.textContent = `Secure Context (${window.location.protocol})`;
+            } else {
+                protocolText.textContent = `Insecure Context (${window.location.protocol}) - Screen Share may fail unless on HTTPS or localhost`;
+                protocolText.parentElement.classList.remove('text-slate-400');
+                protocolText.parentElement.classList.add('text-amber-400');
+            }
+        });
+
+        // Show Banner Error
+        function showError(title, msg) {
+            errorTitle.textContent = title;
+            errorMessage.textContent = msg;
+            errorBanner.classList.remove('hidden');
+        }
+
+        // Start Screen Sharing
+        async function startScreenShare() {
+            errorBanner.classList.add('hidden');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                showError('Browser Not Supported', 'Your browser or current environment does not support navigator.mediaDevices.getDisplayMedia.');
+                return;
+            }
+
+            try {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        cursor: "always"
+                    },
+                    audio: false
+                });
+
+                sourceVideo.srcObject = screenStream;
+                await sourceVideo.play();
+
+                // Setup Canvas Dimensions
+                const videoTrack = screenStream.getVideoTracks()[0];
+                const settings = videoTrack.getSettings();
+                outputCanvas.width = settings.width || 1280;
+                outputCanvas.height = settings.height || 720;
+
+                // Listen for native OS stop share banner click
+                videoTrack.onended = () => {
+                    stopScreenShare();
+                };
+
+                // Update UI State
+                canvasPlaceholder.classList.add('hidden');
+                liveBadge.classList.remove('hidden');
+                btnStartShare.disabled = true;
+                btnStartShare.classList.add('opacity-50', 'cursor-not-allowed');
+                btnStopShare.disabled = false;
+                btnStopShare.classList.remove('text-slate-500', 'border-slate-700/50');
+                btnStopShare.classList.add('text-slate-200', 'border-slate-600');
+                btnToggleRecord.disabled = false;
+
+                updateStatus('Sharing', 'emerald');
+
+                // Start Inversion Rendering Loop
+                renderFrame();
+
+            } catch (err) {
+                console.error("Screen Share Error:", err);
+                if (err.name === 'NotAllowedError') {
+                    showError('Permission Denied', 'Screen share permission was cancelled or blocked.');
+                } else if (err.name === 'NotFoundError') {
+                    showError('No Source Available', 'No screen share source was selected.');
+                } else if (!window.isSecureContext) {
+                    showError('HTTPS Required', 'Browsers block screen sharing on insecure non-HTTPS domains. Deploy with HTTPS or test on localhost.');
+                } else {
+                    showError('Screen Share Error', err.message || 'An error occurred while attempting to start screen sharing.');
+                }
+            }
+        }
+
+        // Stop Screen Share
+        function stopScreenShare() {
+            if (isRecording) {
+                stopRecording();
+            }
+
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
+            if (screenStream) {
+                screenStream.getTracks().forEach(track => track.stop());
+                screenStream = null;
+            }
+
+            sourceVideo.srcObject = null;
+            ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+            // Update UI
+            canvasPlaceholder.classList.remove('hidden');
+            liveBadge.classList.add('hidden');
+            btnStartShare.disabled = false;
+            btnStartShare.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnStopShare.disabled = true;
+            btnStopShare.classList.add('text-slate-500');
+            btnToggleRecord.disabled = true;
+            fpsCounter.textContent = '0 FPS';
+
+            updateStatus('Ready', 'slate');
+        }
+
+        // Render Frame with Inverted RGB
+        function renderFrame() {
+            if (!screenStream || sourceVideo.paused || sourceVideo.ended) return;
+
+            if (outputCanvas.width !== sourceVideo.videoWidth && sourceVideo.videoWidth > 0) {
+                outputCanvas.width = sourceVideo.videoWidth;
+                outputCanvas.height = sourceVideo.videoHeight;
+            }
+
+            // Draw inverted video using canvas filter
+            ctx.filter = 'invert(100%)';
+            ctx.drawImage(sourceVideo, 0, 0, outputCanvas.width, outputCanvas.height);
+
+            // Calculate FPS
+            const now = performance.now();
+            frameCount++;
+            if (now - lastFrameTime >= 1000) {
+                fpsCounter.textContent = `${frameCount} FPS`;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+
+            animationFrameId = requestAnimationFrame(renderFrame);
+        }
+
+        // Toggle Recording
+        function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        // Start Recording from Canvas
+        function startRecording() {
+            if (!screenStream) return;
+
+            recordedChunks = [];
+            
+            // Capture inverted stream directly from Canvas
+            const canvasStream = outputCanvas.captureStream(30);
+
+            let mimeType = 'video/webm;codecs=vp9';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm;codecs=vp8';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'video/webm';
+                }
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(canvasStream, { mimeType });
+            } catch (e) {
+                showError('Recorder Error', 'MediaRecorder failed to initialize on this browser.');
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = handleRecordingStopped;
+
+            mediaRecorder.start(100);
+            isRecording = true;
+            recordStartTime = Date.now();
+
+            // UI Adjustments
+            btnToggleRecord.classList.remove('bg-rose-600', 'hover:bg-rose-500');
+            btnToggleRecord.classList.add('bg-amber-600', 'hover:bg-amber-500');
+            recIcon.className = 'fa-solid fa-square text-xs';
+            recText.textContent = 'Stop Recording';
+
+            progressContainer.classList.remove('hidden');
+            updateStatus('Recording', 'rose');
+
+            // Timer Loop
+            recordTimerInterval = setInterval(() => {
+                const elapsedSeconds = (Date.now() - recordStartTime) / 1000;
+                const formattedTime = formatTime(Math.min(elapsedSeconds, MAX_RECORD_SECONDS));
+                timerDisplay.textContent = `${formattedTime} / 00:30`;
+
+                const percent = Math.min((elapsedSeconds / MAX_RECORD_SECONDS) * 100, 100);
+                progressBar.style.width = `${percent}%`;
+
+                if (elapsedSeconds >= MAX_RECORD_SECONDS) {
+                    stopRecording();
+                }
+            }, 100);
+        }
+
+        // Stop Recording
+        function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false;
+
+            if (recordTimerInterval) {
+                clearInterval(recordTimerInterval);
+                recordTimerInterval = null;
+            }
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+
+            // Reset UI Buttons
+            btnToggleRecord.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+            btnToggleRecord.classList.add('bg-rose-600', 'hover:bg-rose-500');
+            recIcon.className = 'fa-solid fa-circle text-xs';
+            recText.textContent = 'Start Recording (Max 30s)';
+
+            progressContainer.classList.add('hidden');
+            progressBar.style.width = '0%';
+            updateStatus('Sharing', 'emerald');
+        }
+
+        // Save recorded video
+        function handleRecordingStopped() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const videoUrl = URL.createObjectURL(blob);
+
+            recordedVideo.src = videoUrl;
+            recordedVideo.classList.remove('hidden');
+            recordPlaceholder.classList.add('hidden');
+
+            btnDownload.href = videoUrl;
+            btnDownload.download = `inverted-screen-${Date.now()}.webm`;
+            btnDownload.classList.remove('cursor-not-allowed', 'pointer-events-none', 'text-slate-500');
+            btnDownload.classList.add('bg-indigo-600', 'hover:bg-indigo-500', 'text-white', 'shadow-lg', 'shadow-indigo-600/30');
+        }
+
+        // Helpers
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function updateStatus(text, color) {
+            const colors = {
+                slate: 'bg-slate-500',
+                emerald: 'bg-emerald-500 animate-pulse',
+                rose: 'bg-rose-500 animate-ping'
+            };
+            statusBadge.innerHTML = `<span class="w-2 h-2 mr-1.5 rounded-full ${colors[color] || 'bg-slate-500'}"></span> ${text}`;
+        }
+
+        // Listeners
+        btnStartShare.addEventListener('click', startScreenShare);
+        btnStopShare.addEventListener('click', stopScreenShare);
+        btnToggleRecord.addEventListener('click', toggleRecording);
+    </script>
+</body>
+</html>
